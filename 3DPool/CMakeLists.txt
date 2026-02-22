@@ -21,6 +21,20 @@ else()
     option(MOLTEN "Use MoltenVK instead of the Vulkan loader (macOS)" OFF)
 endif()
 
+# Homebrew prefix handling (Apple Silicon is usually /opt/homebrew, Intel is /usr/local)
+if(APPLE AND NOT CMAKE_CROSSCOMPILING)
+    execute_process(
+        COMMAND brew --prefix
+        OUTPUT_VARIABLE BREW_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(BREW_PREFIX AND EXISTS "${BREW_PREFIX}")
+        list(PREPEND CMAKE_PREFIX_PATH "${BREW_PREFIX}")
+    endif()
+endif()
+
+# Keep /usr/local as a fallback prefix (Intel Homebrew, custom installs)
 list(APPEND CMAKE_PREFIX_PATH "/usr/local")
 
 find_package(SDL2        REQUIRED)
@@ -28,7 +42,8 @@ find_package(SDL2_ttf    REQUIRED)
 find_package(SDL2_mixer  REQUIRED)
 find_package(libmx2      REQUIRED)
 
-if(NOT MINGW)
+# Only require Vulkan SDK via find_package when we are NOT using MoltenVK
+if(NOT MINGW AND NOT MOLTEN)
     find_package(Vulkan REQUIRED)
 endif()
 
@@ -39,11 +54,13 @@ if(MOLTEN)
                 COMMAND brew --prefix molten-vk
                 OUTPUT_VARIABLE BREW_MOLTEN_PATH
                 OUTPUT_STRIP_TRAILING_WHITESPACE
-                ERROR_QUIET)
+                ERROR_QUIET
+            )
             if(EXISTS "${BREW_MOLTEN_PATH}")
                 set(MOLTEN_PATH "${BREW_MOLTEN_PATH}")
             endif()
         endif()
+
         if(NOT MOLTEN_PATH AND DEFINED ENV{VULKAN_SDK} AND EXISTS "$ENV{VULKAN_SDK}")
             set(MOLTEN_PATH "$ENV{VULKAN_SDK}")
         endif()
@@ -54,26 +71,56 @@ if(MOLTEN)
             "MoltenVK not found.\n"
             "  Install:   brew install molten-vk\n"
             "  Or set:    cmake -DMOLTEN_PATH=/path/to/molten-vk ..\n"
-            "  Or use the Vulkan loader: cmake -DMOLTEN=OFF ..")
+            "  Or use the Vulkan loader: cmake -DMOLTEN=OFF .."
+        )
+    endif()
+
+    # Vulkan headers are often NOT inside the molten-vk keg on Homebrew.
+    # They are typically in the main prefix include via vulkan-headers.
+    if(NOT DEFINED BREW_PREFIX AND NOT CMAKE_CROSSCOMPILING)
+        execute_process(
+            COMMAND brew --prefix
+            OUTPUT_VARIABLE BREW_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
     endif()
 
     find_path(MOLTEN_INCLUDE_DIR vulkan/vulkan.h
-        HINTS "${MOLTEN_PATH}/include" "${MOLTEN_PATH}/include/MoltenVK"
-        NO_DEFAULT_PATH)
+        HINTS
+            "${MOLTEN_PATH}/include"
+            "${MOLTEN_PATH}/include/MoltenVK"
+            "${BREW_PREFIX}/include"
+            "/opt/homebrew/include"
+            "/usr/local/include"
+    )
+
     if(NOT MOLTEN_INCLUDE_DIR)
         message(FATAL_ERROR
-            "MoltenVK vulkan.h not found under ${MOLTEN_PATH}/include.\n"
-            "  Try: brew install molten-vk vulkan-headers")
+            "MoltenVK Vulkan headers not found.\n"
+            "  Wanted: vulkan/vulkan.h\n"
+            "  Tried:  ${MOLTEN_PATH}/include and Homebrew include.\n"
+            "  Fix:    brew install vulkan-headers\n"
+            "  Or set: cmake -DMOLTEN_PATH=/path/to/VulkanSDK .."
+        )
     endif()
 
     find_library(MOLTEN_LIBRARY NAMES MoltenVK
-        HINTS "${MOLTEN_PATH}/lib"
-        NO_DEFAULT_PATH)
+        HINTS
+            "${MOLTEN_PATH}/lib"
+            "${BREW_PREFIX}/lib"
+            "/opt/homebrew/lib"
+            "/usr/local/lib"
+    )
+
     if(NOT MOLTEN_LIBRARY)
         message(FATAL_ERROR
-            "libMoltenVK not found in ${MOLTEN_PATH}/lib.\n"
-            "  Try: brew install molten-vk")
+            "libMoltenVK not found.\n"
+            "  Tried: ${MOLTEN_PATH}/lib and Homebrew lib.\n"
+            "  Fix:   brew install molten-vk"
+        )
     endif()
+
     get_filename_component(MOLTEN_LIB_DIR "${MOLTEN_LIBRARY}" DIRECTORY)
 
     set(MOLTEN_FRAMEWORKS
@@ -140,7 +187,8 @@ endif()
 
 find_path(_sdl2_check SDL.h
     HINTS ${SDL2_INCLUDE_DIRS}
-    PATH_SUFFIXES SDL2)
+    PATH_SUFFIXES SDL2
+)
 if(_sdl2_check)
     message(STATUS "  [OK]   SDL.h  (${_sdl2_check})")
 else()
@@ -152,7 +200,8 @@ set(_sdl2_headers SDL_vulkan.h SDL_ttf.h SDL_mixer.h)
 foreach(_hdr ${_sdl2_headers})
     find_path(_sdl2_${_hdr}_dir ${_hdr}
         HINTS ${SDL2_INCLUDE_DIRS}
-        PATH_SUFFIXES SDL2)
+        PATH_SUFFIXES SDL2
+    )
     if(_sdl2_${_hdr}_dir)
         message(STATUS "  [OK]   ${_hdr}")
     else()
@@ -182,6 +231,8 @@ unset(_glm_transform_dir CACHE)
 
 if(MINGW)
     message(STATUS "  [SKIP] MINGW build - Vulkan loaded at runtime via volk")
+elseif(MOLTEN)
+    message(STATUS "  [OK]   MoltenVK build - Vulkan headers from ${MOLTEN_INCLUDE_DIR}")
 elseif(Vulkan_FOUND)
     message(STATUS "  [OK]   Vulkan ${Vulkan_VERSION}  (${Vulkan_LIBRARIES})")
 else()
@@ -190,9 +241,10 @@ else()
 endif()
 
 set(_mx2_lib_targets libmx2::mx libmx2::mxvk)
-if(NOT MINGW)
+if(NOT MINGW AND NOT MOLTEN)
     list(APPEND _mx2_lib_targets libmx2::volk)
 endif()
+
 foreach(_tgt ${_mx2_lib_targets})
     if(TARGET ${_tgt})
         get_target_property(_loc ${_tgt} IMPORTED_LOCATION)
@@ -222,6 +274,7 @@ set(_sdl2_required_targets SDL2::SDL2 SDL2_ttf::SDL2_ttf SDL2_mixer::SDL2_mixer)
 if(MINGW)
     list(APPEND _sdl2_required_targets SDL2::SDL2main)
 endif()
+
 foreach(_tgt ${_sdl2_required_targets})
     if(TARGET ${_tgt})
         message(STATUS "  [OK]   ${_tgt}")
@@ -231,7 +284,6 @@ foreach(_tgt ${_sdl2_required_targets})
     endif()
 endforeach()
 
-
 message(STATUS "")
 message(STATUS "[Source] Checking source files ...")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
@@ -240,7 +292,6 @@ else()
     message(WARNING "  [MISS] main.cpp")
     set(_check_pass FALSE)
 endif()
-
 
 message(STATUS "")
 message(STATUS "[Assets] Checking data directory ...")
@@ -279,7 +330,6 @@ foreach(_asset ${_required_assets})
     endif()
 endforeach()
 
-
 message(STATUS "")
 if(_check_pass)
     message(STATUS "=========== All checks PASSED ===================")
@@ -288,15 +338,21 @@ else()
 endif()
 message(STATUS "")
 
+# Use a safe CMake target name, keep output binary/app name as 3DPool
 if(MINGW)
     set(WIN_RC "${CMAKE_CURRENT_SOURCE_DIR}/ball.rc")
-    add_executable(3DPool WIN32 main.cpp ${WIN_RC})
+    add_executable(Pool3D WIN32 main.cpp ${WIN_RC})
 else()
-    add_executable(3DPool main.cpp)
+    add_executable(Pool3D main.cpp)
 endif()
 
+set_target_properties(Pool3D PROPERTIES
+    OUTPUT_NAME "3DPool"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+
 if(MINGW)
-    target_link_libraries(3DPool PRIVATE
+    target_link_libraries(Pool3D PRIVATE
         SDL2::SDL2main
         libmx2::mx
         libmx2::mxvk
@@ -305,10 +361,10 @@ if(MINGW)
         SDL2_mixer::SDL2_mixer
     )
 elseif(MOLTEN)
-    target_compile_definitions(3DPool PRIVATE WITH_MOLTEN)
-    target_link_directories(3DPool PRIVATE ${MOLTEN_LIB_DIR})
-    target_include_directories(3DPool PRIVATE ${MOLTEN_INCLUDE_DIR})
-    target_link_libraries(3DPool PRIVATE
+    target_compile_definitions(Pool3D PRIVATE WITH_MOLTEN)
+    target_link_directories(Pool3D PRIVATE ${MOLTEN_LIB_DIR})
+    target_include_directories(Pool3D PRIVATE ${MOLTEN_INCLUDE_DIR})
+    target_link_libraries(Pool3D PRIVATE
         libmx2::mx
         libmx2::mxvk
         SDL2::SDL2
@@ -318,7 +374,7 @@ elseif(MOLTEN)
         ${MOLTEN_FRAMEWORKS}
     )
 else()
-    target_link_libraries(3DPool PRIVATE
+    target_link_libraries(Pool3D PRIVATE
         libmx2::mx
         libmx2::mxvk
         libmx2::volk
@@ -330,27 +386,23 @@ else()
     )
 endif()
 
-set_target_properties(3DPool PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-)
-
-add_custom_command(TARGET 3DPool POST_BUILD
+add_custom_command(TARGET Pool3D POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/data"
-        "$<TARGET_FILE_DIR:3DPool>/data"
+        "$<TARGET_FILE_DIR:Pool3D>/data"
     COMMENT "Copying data/ assets to build directory"
 )
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/font.ttf")
-    add_custom_command(TARGET 3DPool POST_BUILD
+    add_custom_command(TARGET Pool3D POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/font.ttf"
-            "$<TARGET_FILE_DIR:3DPool>/font.ttf"
+            "$<TARGET_FILE_DIR:Pool3D>/font.ttf"
         COMMENT "Copying font.ttf to build directory"
     )
 endif()
 
-install(TARGETS 3DPool RUNTIME DESTINATION bin)
+install(TARGETS Pool3D RUNTIME DESTINATION bin)
 install(DIRECTORY data/ DESTINATION share/3DPool/data)
 install(FILES font.ttf DESTINATION share/3DPool)
 
@@ -360,7 +412,9 @@ message(STATUS "  Compiler     : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_V
 message(STATUS "  SDL2         : ${SDL2_VERSION}")
 message(STATUS "  SDL2_ttf     : found")
 message(STATUS "  SDL2_mixer   : found")
-if(NOT MINGW)
+if(MOLTEN)
+    message(STATUS "  Vulkan       : MoltenVK (${MOLTEN_LIBRARY})")
+elseif(NOT MINGW)
     message(STATUS "  Vulkan       : ${Vulkan_VERSION}")
 endif()
 message(STATUS "  libmx2       : found")
