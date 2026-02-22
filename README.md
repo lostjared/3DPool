@@ -136,17 +136,16 @@ After a successful build the binary and the `data/` directory are placed togethe
 ./3DPool -p . -f
 
 # Custom resolution (default: 1280×720)
-./3DPool -p . -P path/to/assets
+./3DPool -p . -r 1920x1080
 
 # Show all options
-./3DPool --help
+./3DPool -h
 ```
 
 | Flag | Description |
 |------|-------------|
-| `-p <path>` | Path to the directory containing `data/` and `font.ttf` (required) |
-| `-P <path>` | Long form of `-p` |
-| `-f` / `-F` | Fullscreen mode |
+| `-p <path>` / ---path <path> | Path to the directory containing `data/` and `font.ttf` (required) |
+| `-f` / `--fullscreen` | Fullscreen mode |
 
 ---
 
