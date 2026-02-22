@@ -231,7 +231,7 @@ foreach(_tgt ${_sdl2_required_targets})
     endif()
 endforeach()
 
-# ---- Source file ----
+
 message(STATUS "")
 message(STATUS "[Source] Checking source files ...")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
@@ -241,7 +241,7 @@ else()
     set(_check_pass FALSE)
 endif()
 
-# ---- Data directory ----
+
 message(STATUS "")
 message(STATUS "[Assets] Checking data directory ...")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data")
@@ -279,7 +279,7 @@ foreach(_asset ${_required_assets})
     endif()
 endforeach()
 
-# ---- Final verdict ----
+
 message(STATUS "")
 if(_check_pass)
     message(STATUS "=========== All checks PASSED ===================")
@@ -288,18 +288,13 @@ else()
 endif()
 message(STATUS "")
 
-# ---------------------------------------------------------------------------
-# Create executable
-# ---------------------------------------------------------------------------
 if(MINGW)
-    add_executable(3DPool WIN32 main.cpp)
+    set(WIN_RC "${CMAKE_CURRENT_SOURCE_DIR}/ball.rc")
+    add_executable(3DPool WIN32 main.cpp ${WIN_RC})
 else()
     add_executable(3DPool main.cpp)
 endif()
 
-# ---------------------------------------------------------------------------
-# Link libraries
-# ---------------------------------------------------------------------------
 if(MINGW)
     target_link_libraries(3DPool PRIVATE
         SDL2::SDL2main
@@ -335,9 +330,6 @@ else()
     )
 endif()
 
-# ---------------------------------------------------------------------------
-# Output directory & copy runtime data
-# ---------------------------------------------------------------------------
 set_target_properties(3DPool PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
@@ -358,16 +350,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/font.ttf")
     )
 endif()
 
-# ---------------------------------------------------------------------------
-# Install
-# ---------------------------------------------------------------------------
 install(TARGETS 3DPool RUNTIME DESTINATION bin)
 install(DIRECTORY data/ DESTINATION share/3DPool/data)
 install(FILES font.ttf DESTINATION share/3DPool)
 
-# ---------------------------------------------------------------------------
-# Summary
-# ---------------------------------------------------------------------------
 message(STATUS "----------- 3DPool build summary -----------")
 message(STATUS "  C++ standard : C++${CMAKE_CXX_STANDARD}")
 message(STATUS "  Compiler     : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
