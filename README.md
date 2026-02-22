@@ -1,4 +1,4 @@
-# 3D Pool — Vulkan
+# 3D Pool Demo 
 
 A fully 3D billiards game rendered with the Vulkan graphics API, built on the **libmx2 (MX2)** engine. Pocket all 15 object balls in as few shots as possible and post your name on the high-score board.
 
