@@ -16,7 +16,7 @@ A fully 3D billiards game rendered with the Vulkan graphics API, built on the **
 
 ## Features
 
-- Real-time 3D Vulkan rendering with perspective camera
+- Real-time 3D Vulkan rendering with perspective camera (Requires your Graphics Card supports Vulkan)
 - Full physics simulation — friction, ball–ball collisions, wall bounces, pocket detection
 - Animated ball-sink effect when a ball drops into a pocket
 - Rack of 15 object balls + cue ball, 6 pockets
