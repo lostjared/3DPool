@@ -14,6 +14,9 @@
 #include <memory>
 #include <fstream>
 #include <sstream>
+#include <cstdint>
+#include <limits>
+#include <unordered_map>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -31,6 +34,8 @@ static constexpr float MIN_SPEED = 0.001f;
 static constexpr float MAX_POWER = 1.5f;
 static constexpr int MAX_DRAWS = 48;
 static constexpr float PKT_INS = 0.25f;
+static constexpr float CAM_BASE_HEIGHT_RATIO = 0.92f;
+static constexpr float CAM_BASE_TOTAL_SCALE = 1.359411f;
 static const glm::vec2 POCKETS[6] = {
     { -TABLE_HALF_W + PKT_INS, TABLE_HALF_H - PKT_INS },
     { 0.0f, TABLE_HALF_H - 0.15f },
@@ -138,6 +143,12 @@ public:
     PoolWindow(const std::string &path, int wx, int wy, bool full)
         : mx::VKWindow("-[ 3D Pool / Vulkan ]-", wx, wy, full) {
         setPath(path);
+        std::string ico_path = path + "/data/ball.bmp";
+        SDL_Surface *ico = SDL_LoadBMP(ico_path.c_str());
+        if(ico) {
+            SDL_SetWindowIcon(window, ico);
+            SDL_FreeSurface(ico);
+        }
     }
     ~PoolWindow() override = default;
     void initVulkan() override {
@@ -226,10 +237,11 @@ public:
             startscreenSprite->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
             startscreenSprite->drawSpriteRect(0, 0, getWidth(), getHeight());
         }
-        const char *hint = "ENTER / A  -  Play      SPACE /Y  -  Scores      ESC / Back  -  Quit";
         int tw, th;
+        const char *hint = "ENTER / A  -  Play";
         getTextDimensions(hint, tw, th);
         printText(hint, w / 2 - tw / 2, (h - th * 3)+20, {220, 220, 100, 255});
+        updateStartClickTargets();
         const Uint8 *keys = SDL_GetKeyboardState(nullptr);
         if(keys[SDL_SCANCODE_RETURN]) {
             resetGame();
@@ -313,13 +325,13 @@ public:
             if (balls[i].active && !balls[i].pocketed) rem++;
         printText("Balls: " + std::to_string(rem), 15, 75, {200, 200, 200, 255});
         if (phase == GamePhase::Aiming)
-            printText("Arrows/L-Stick: Aim | Space/A/B: Charge & Shoot | R-Stick: Cam", 15, h - 40, {180, 180, 180, 255});
+            printText("Mouse: move aim + hold/release | Right-drag: rotate table | Wheel/Pinch: zoom", 15, h - 40, {180, 180, 180, 255});
         else if (phase == GamePhase::Charging) {
             int pct = static_cast<int>(chargeAmount / MAX_POWER * 100.0f);
             printText("Power: " + std::to_string(pct) + "%", 15, 105,
                       {255, static_cast<Uint8>(255 - pct * 2), 0, 255});
         } else if (phase == GamePhase::Placing)
-            printText("Arrows/L-Stick: move cue ball | Enter/A/B: place", 15, h - 40, {255, 100, 100, 255});
+            printText("Mouse move: place cue by camera direction | Click/Enter/A/B: place", 15, h - 40, {255, 100, 100, 255});
         else if (phase == GamePhase::GameOver) {
         }
     }
@@ -329,6 +341,11 @@ public:
             lastScoreFontSize = 0;
         }
         screen = scr;
+        if (screen == GameScreen::Game) {
+            setMouseCapture(true);
+        } else {
+            setMouseCapture(false);
+        }
     }
     void goToScoresScreen() {
         finalScore = shotCount;
@@ -341,23 +358,17 @@ public:
             scoresBackground->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
             scoresBackground->drawSpriteRect(0, 0, getWidth(), getHeight());
         }
-
-        // Felt area as fractions of the window, matched to the start.png image layout.
-        // Adjust these if the image layout differs.
-        int feltL  = (int)(w * 0.125f);   // left rail edge
-        int feltT  = (int)(h * 0.19f);    // below the decorative HIGH SCORES banner
-        int feltB  = (int)(h * 0.87f);    // above the bottom rail
-        int feltH  = feltB - feltT;
-        int feltCX = (int)(w * 0.48f);    // horizontal centre of felt
-
-        // Scale font so 10 entries + prompt fit comfortably inside the felt
+        int feltL = (int)(w * 0.125f);   
+        int feltT = (int)(h * 0.19f);    
+        int feltB = (int)(h * 0.87f);    
+        int feltH = feltB - feltT;
+        int feltCX = (int)(w * 0.48f);    
         int fs = std::max(10, feltH / 15);
         if (fs != lastScoreFontSize) {
             setFont("font.ttf", fs);
             lastScoreFontSize = fs;
         }
-        int lineH = fs + fs / 3;  // line height with inter-line spacing
-
+        int lineH = fs + fs / 3;  
         const auto &scoreList = highScores.list();
         for (size_t i = 0; i < scoreList.size() && i < 10; i++) {
             std::ostringstream ss;
@@ -373,7 +384,6 @@ public:
             }
             printText(row, feltL + fs / 2, feltT + (int)i * lineH, col);
         }
-
         if (enteringName) {
             int entryY = feltT + 10 * lineH + lineH / 2;
             std::ostringstream ss;
@@ -388,12 +398,16 @@ public:
             const char *hint = "ENTER to confirm  |  BACKSPACE to delete";
             getTextDimensions(hint, tw, th);
             printText(hint, feltCX - tw / 2, entryY + lineH * 2, {200, 200, 200, 255});
+            std::string clickHint = "Mouse/Touch: click to confirm or delete";
+            getTextDimensions(clickHint, tw, th);
+            printText(clickHint, feltCX - tw / 2, entryY + lineH * 3, {170, 220, 220, 255});
         } else {
             const char *ret = "Press ENTER to return to intro";
             int tw, th;
             getTextDimensions(ret, tw, th);
             printText(ret, feltCX - tw / 2, feltB - lineH, {255, 255, 0, 255});
         }
+        updateScoresClickTargets();
     }
     void proc() override {
         switch(screen) {
@@ -462,9 +476,7 @@ public:
         }
         float aspect = vp.width / vp.height;
         float time = SDL_GetTicks() / 1000.0f;
-        float camDist = camZoom;
-        float camHeight = camZoom * 0.92f;
-        glm::vec3 camPos = glm::vec3(sinf(camAngle) * camDist, camHeight, cosf(camAngle) * camDist);
+        glm::vec3 camPos = getCameraPosition();
         glm::vec3 camTarget = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::mat4 viewMat = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
@@ -584,7 +596,132 @@ public:
     }
     void event(SDL_Event &e) override {
         if (e.type == SDL_QUIT) { quit(); return; }
+        if (e.type == SDL_MOUSEWHEEL && screen == GameScreen::Game) {
+            float wheelY = (e.wheel.preciseY != 0.0f) ? e.wheel.preciseY : (float)e.wheel.y;
+            camZoom -= wheelY * 1.2f;
+            camZoom = glm::clamp(camZoom, 5.0f, 25.0f);
+            return;
+        }
+        if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT
+            && screen == GameScreen::Game) {
+            if (!mouseCaptured) setMouseCapture(true);
+            mouseCamDragging = true;
+            mouseCamLastX = (int)e.button.x;
+            mouseCamLastY = (int)e.button.y;
+            return;
+        }
+        if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+            if (screen == GameScreen::Game && !mouseCaptured) {
+                setMouseCapture(true);
+                consumeNextMouseLeftUp = true;
+                return;
+            }
+            onPointerDown((int)e.button.x, (int)e.button.y, -1);
+            return;
+        }
+        if (e.type == SDL_MOUSEMOTION) {
+            if (screen == GameScreen::Game && mouseCaptured) {
+                if (mouseCamDragging) {
+                    camAngle += (float)e.motion.xrel * 0.01f;
+                    camPitch -= (float)e.motion.yrel * 0.006f;
+                    camPitch = glm::clamp(camPitch, 0.30f, 1.25f);
+                    return;
+                }
+                onMouseRelativeMove(e.motion.xrel, e.motion.yrel);
+                return;
+            }
+            if (mouseCamDragging && screen == GameScreen::Game) {
+                int nx = (int)e.motion.x;
+                int ny = (int)e.motion.y;
+                int dx = nx - mouseCamLastX;
+                int dy = ny - mouseCamLastY;
+                camAngle += (float)dx * 0.01f;
+                camPitch -= (float)dy * 0.006f;
+                camPitch = glm::clamp(camPitch, 0.30f, 1.25f);
+                mouseCamLastX = nx;
+                mouseCamLastY = ny;
+                return;
+            }
+            onPointerMove((int)e.motion.x, (int)e.motion.y, -1);
+            return;
+        }
+        if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT) {
+            mouseCamDragging = false;
+            return;
+        }
+        if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+            if (consumeNextMouseLeftUp) {
+                consumeNextMouseLeftUp = false;
+                return;
+            }
+            onPointerUp((int)e.button.x, (int)e.button.y, -1);
+            return;
+        }
+        if (e.type == SDL_FINGERDOWN) {
+            int px = (int)(e.tfinger.x * (float)w);
+            int py = (int)(e.tfinger.y * (float)h);
+            touchPoints[(int64_t)e.tfinger.fingerId] = SDL_FPoint{(float)px, (float)py};
+            if (screen == GameScreen::Game && touchPoints.size() == 2) {
+                auto it = touchPoints.begin();
+                SDL_FPoint a = it->second;
+                ++it;
+                SDL_FPoint b = it->second;
+                touchPinchDistance = sqrtf((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+                touchPinchActive = true;
+                if (phase == GamePhase::Charging) {
+                    phase = GamePhase::Aiming;
+                    chargeAmount = 0.0f;
+                }
+                pointerCharging = false;
+                pointerDown = false;
+                activePointerId = std::numeric_limits<int64_t>::min();
+                return;
+            }
+            onPointerDown(px, py, (int64_t)e.tfinger.fingerId);
+            return;
+        }
+        if (e.type == SDL_FINGERMOTION) {
+            int px = (int)(e.tfinger.x * (float)w);
+            int py = (int)(e.tfinger.y * (float)h);
+            touchPoints[(int64_t)e.tfinger.fingerId] = SDL_FPoint{(float)px, (float)py};
+            if (screen == GameScreen::Game && touchPinchActive && touchPoints.size() >= 2) {
+                auto it = touchPoints.begin();
+                SDL_FPoint a = it->second;
+                ++it;
+                SDL_FPoint b = it->second;
+                float dist = sqrtf((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+                float d = dist - touchPinchDistance;
+                touchPinchDistance = dist;
+                camZoom -= d * 0.02f;
+                camZoom = glm::clamp(camZoom, 5.0f, 25.0f);
+                return;
+            }
+            onPointerMove(px, py, (int64_t)e.tfinger.fingerId);
+            return;
+        }
+        if (e.type == SDL_FINGERUP) {
+            int px = (int)(e.tfinger.x * (float)w);
+            int py = (int)(e.tfinger.y * (float)h);
+            bool wasPinching = touchPinchActive;
+            touchPoints.erase((int64_t)e.tfinger.fingerId);
+            if (touchPinchActive && touchPoints.size() < 2) {
+                touchPinchActive = false;
+                touchPinchDistance = 0.0f;
+            }
+            if (wasPinching) {
+                pointerCharging = false;
+                pointerDown = false;
+                activePointerId = std::numeric_limits<int64_t>::min();
+                return;
+            }
+            onPointerUp(px, py, (int64_t)e.tfinger.fingerId);
+            return;
+        }
         if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+            if (screen == GameScreen::Game && mouseCaptured) {
+                setMouseCapture(false);
+                return;
+            }
             if (screen == GameScreen::Scores) {
                 setScreen(GameScreen::Intro);
             } else {
@@ -727,6 +864,7 @@ public:
         }
     }
     void cleanup() override {
+        setMouseCapture(false);
         if (gameController) {
             SDL_GameControllerClose(gameController);
             gameController = nullptr;
@@ -756,6 +894,7 @@ private:
     int shotCount = 0;
     float lastTime = 0.0f;
     float camAngle = 0.4f;
+    float camPitch = 0.744604f;
     float camZoom = 13.0f;
     SDL_GameController *gameController = nullptr;
     int ctrlChargeButton = -1;
@@ -771,6 +910,35 @@ private:
     std::string playerName;
     int finalScore = 0;
     int lastScoreFontSize = 0;
+    SDL_Rect startPlayRect{0, 0, 0, 0};
+    SDL_Rect scoresReturnRect{0, 0, 0, 0};
+    SDL_Rect scoresConfirmRect{0, 0, 0, 0};
+    SDL_Rect scoresDeleteRect{0, 0, 0, 0};
+    bool pointerDown = false;
+    bool pointerCharging = false;
+    int64_t activePointerId = std::numeric_limits<int64_t>::min();
+    bool consumeNextMouseLeftUp = false;
+    bool mouseCaptured = false;
+    bool mouseCamDragging = false;
+    int mouseCamLastX = 0;
+    int mouseCamLastY = 0;
+    bool touchPinchActive = false;
+    float touchPinchDistance = 0.0f;
+    std::unordered_map<int64_t, SDL_FPoint> touchPoints;
+    void setMouseCapture(bool enabled) {
+        if (mouseCaptured == enabled) return;
+        mouseCaptured = enabled;
+        SDL_SetWindowGrab(window, enabled ? SDL_TRUE : SDL_FALSE);
+        SDL_SetRelativeMouseMode(enabled ? SDL_TRUE : SDL_FALSE);
+        SDL_ShowCursor(enabled ? SDL_DISABLE : SDL_ENABLE);
+        mouseCamDragging = false;
+    }
+    glm::vec3 getCameraPosition() const {
+        float orbitDist = camZoom * CAM_BASE_TOTAL_SCALE;
+        float horiz = orbitDist * cosf(camPitch);
+        float y = orbitDist * sinf(camPitch);
+        return glm::vec3(sinf(camAngle) * horiz, y, cosf(camAngle) * horiz);
+    }
     void loadTableTexture() {
         std::string path = util.path + "/data/table.png";
         SDL_Surface *surface = png::LoadPNG(path.c_str());
@@ -997,6 +1165,13 @@ private:
         cueAngle = 0.0f;
         chargeAmount = 0.0f;
         shotCount = 0;
+        pointerDown = false;
+        pointerCharging = false;
+        activePointerId = std::numeric_limits<int64_t>::min();
+        mouseCamDragging = false;
+        touchPinchActive = false;
+        touchPinchDistance = 0.0f;
+        touchPoints.clear();
         lastTime = SDL_GetTicks() / 1000.0f;
     }
     void handleAiming(float dt) {
@@ -1113,6 +1288,228 @@ private:
     }
     void checkGameOver() {
         if (allObjectBallsPocketed()) goToScoresScreen();
+    }
+    bool pointerOwnsCharge(int64_t pointerId) const {
+        return pointerCharging && activePointerId == pointerId;
+    }
+    bool screenPointToTable(int px, int py, glm::vec2 &out) const {
+        if (w <= 0 || h <= 0) return false;
+        float aspect = (float)w / (float)h;
+        glm::vec3 camPos = getCameraPosition();
+        glm::vec3 camTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+        glm::mat4 viewMat = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 projMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+        projMat[1][1] *= -1.0f;
+        float nx = (2.0f * ((float)px + 0.5f) / (float)w) - 1.0f;
+        float ny = 1.0f - (2.0f * ((float)py + 0.5f) / (float)h);
+        glm::vec4 nearClip(nx, ny, 0.0f, 1.0f);
+        glm::vec4 farClip(nx, ny, 1.0f, 1.0f);
+        glm::mat4 invVP = glm::inverse(projMat * viewMat);
+        glm::vec4 nearWorld = invVP * nearClip;
+        glm::vec4 farWorld = invVP * farClip;
+        if (fabsf(nearWorld.w) < 1e-6f || fabsf(farWorld.w) < 1e-6f) return false;
+        nearWorld /= nearWorld.w;
+        farWorld /= farWorld.w;
+        glm::vec3 ro(nearWorld.x, nearWorld.y, nearWorld.z);
+        glm::vec3 rf(farWorld.x, farWorld.y, farWorld.z);
+        glm::vec3 rd = glm::normalize(rf - ro);
+        if (fabsf(rd.y) < 1e-6f) return false;
+        float t = -ro.y / rd.y;
+        if (t < 0.0f) return false;
+        glm::vec3 hit = ro + rd * t;
+        out = glm::vec2(hit.x, hit.z);
+        return true;
+    }
+    void updateCueFromPointer(int px, int py) {
+        if (screen != GameScreen::Game || !balls[0].active || balls[0].pocketed) return;
+        glm::vec2 tablePos;
+        if (!screenPointToTable(px, py, tablePos)) return;
+        glm::vec2 d = tablePos - balls[0].pos;
+        if (glm::dot(d, d) < 0.00001f) return;
+        float worldAngle = atan2f(d.y, d.x);
+        cueAngle = worldAngle - camAngle;
+    }
+    bool canPlaceCueBall() const {
+        for (int i = 1; i < NUM_BALLS; i++) {
+            if (!balls[i].active || balls[i].pocketed) continue;
+            if (glm::length(balls[0].pos - balls[i].pos) < BALL_RADIUS * 2.5f)
+                return false;
+        }
+        return true;
+    }
+    void placeCueBallFromPointer(int px, int py) {
+        if (phase != GamePhase::Placing || !balls[0].active || balls[0].pocketed) return;
+        glm::vec2 tablePos;
+        if (!screenPointToTable(px, py, tablePos)) return;
+        float m = BALL_RADIUS + 0.1f;
+        balls[0].pos.x = glm::clamp(tablePos.x, -TABLE_HALF_W + m, TABLE_HALF_W - m);
+        balls[0].pos.y = glm::clamp(tablePos.y, -TABLE_HALF_H + m, TABLE_HALF_H - m);
+    }
+    void shootCueBall() {
+        float worldCueAngle = cueAngle + camAngle;
+        glm::vec2 dir(cosf(worldCueAngle), sinf(worldCueAngle));
+        balls[0].vel = dir * chargeAmount;
+        phase = GamePhase::Rolling;
+        shotCount++;
+        chargeAmount = 0.0f;
+        pointerCharging = false;
+        pointerDown = false;
+        activePointerId = std::numeric_limits<int64_t>::min();
+    }
+    SDL_Rect makeTextRect(const std::string &txt, int x, int y, int pad) {
+        int tw = 0, th = 0;
+        getTextDimensions(txt, tw, th);
+        SDL_Rect r;
+        r.x = x - pad;
+        r.y = y - pad;
+        r.w = tw + pad * 2;
+        r.h = th + pad * 2;
+        return r;
+    }
+    bool pointInRect(int x, int y, const SDL_Rect &r) const {
+        return x >= r.x && x <= (r.x + r.w) && y >= r.y && y <= (r.y + r.h);
+    }
+    SDL_Rect makeNormRect(float cxN, float cyN, float wN, float hN) const {
+        int rw = std::max(1, (int)(w * wN));
+        int rh = std::max(1, (int)(h * hN));
+        int cx = (int)(w * cxN);
+        int cy = (int)(h * cyN);
+        SDL_Rect r;
+        r.x = cx - rw / 2;
+        r.y = cy - rh / 2;
+        r.w = rw;
+        r.h = rh;
+        return r;
+    }
+    void updateStartClickTargets() {
+        startPlayRect = makeNormRect(0.50f, 0.78f, 0.28f, 0.11f);
+    }
+    void updateScoresClickTargets() {
+        int feltT = (int)(h * 0.19f);
+        int feltB = (int)(h * 0.87f);
+        int feltH = feltB - feltT;
+        int fs = std::max(10, feltH / 15);
+        int lineH = fs + fs / 3;
+        int feltCX = (int)(w * 0.48f);
+        if (enteringName) {
+            int entryY = feltT + 10 * lineH + lineH / 2;
+            std::string conf = "ENTER to confirm";
+            std::string del = "BACKSPACE to delete";
+            int tw = 0, th = 0;
+            getTextDimensions(conf, tw, th);
+            scoresConfirmRect = makeTextRect(conf, feltCX - tw - fs / 3, entryY + lineH * 2, 10);
+            getTextDimensions(del, tw, th);
+            scoresDeleteRect = makeTextRect(del, feltCX + fs / 3, entryY + lineH * 2, 10);
+            scoresReturnRect = {0, 0, 0, 0};
+        } else {
+            std::string ret = "Press ENTER to return to intro";
+            int tw = 0, th = 0;
+            getTextDimensions(ret, tw, th);
+            scoresReturnRect = makeTextRect(ret, feltCX - tw / 2, feltB - lineH, 12);
+            scoresConfirmRect = {0, 0, 0, 0};
+            scoresDeleteRect = {0, 0, 0, 0};
+        }
+    }
+    void onPointerDown(int px, int py, int64_t pointerId) {
+        if (screen == GameScreen::Intro) {
+            setScreen(GameScreen::Start);
+            return;
+        }
+        if (screen == GameScreen::Start) {
+            updateStartClickTargets();
+            if (pointInRect(px, py, startPlayRect)) {
+                resetGame();
+                setScreen(GameScreen::Game);
+                return;
+            }
+        }
+        if (screen == GameScreen::Scores) {
+            updateScoresClickTargets();
+            if (!enteringName) {
+                if (pointInRect(px, py, scoresReturnRect)) setScreen(GameScreen::Intro);
+                return;
+            }
+            if (pointInRect(px, py, scoresConfirmRect) && !playerName.empty()) {
+                highScores.addScore(playerName, finalScore);
+                highScores.write();
+                enteringName = false;
+                return;
+            }
+            if (pointInRect(px, py, scoresDeleteRect) && !playerName.empty()) {
+                playerName.pop_back();
+                return;
+            }
+            return;
+        }
+        if (screen != GameScreen::Game) return;
+        if (activePointerId != std::numeric_limits<int64_t>::min() && activePointerId != pointerId) return;
+        pointerDown = true;
+        activePointerId = pointerId;
+        if (phase == GamePhase::Aiming) {
+            updateCueFromPointer(px, py);
+            phase = GamePhase::Charging;
+            chargeAmount = 0.0f;
+            pointerCharging = true;
+        } else if (phase == GamePhase::Charging) {
+            updateCueFromPointer(px, py);
+            pointerCharging = true;
+        } else if (phase == GamePhase::Placing) {
+            if (!(pointerId == -1 && mouseCaptured)) {
+                placeCueBallFromPointer(px, py);
+            }
+        }
+    }
+    void onPointerMove(int px, int py, int64_t pointerId) {
+        if (screen != GameScreen::Game) return;
+        if (pointerId == -1 && !mouseCaptured) return;
+        if (activePointerId != std::numeric_limits<int64_t>::min() && activePointerId != pointerId) return;
+        if (phase == GamePhase::Aiming || phase == GamePhase::Charging) {
+            updateCueFromPointer(px, py);
+        } else if (phase == GamePhase::Placing && (pointerId != -1 || !mouseCaptured)) {
+            placeCueBallFromPointer(px, py);
+        }
+    }
+    void onMouseRelativeMove(int dx, int dy) {
+        if (screen != GameScreen::Game) return;
+        if (phase == GamePhase::Aiming || phase == GamePhase::Charging) {
+            cueAngle += (float)dx * 0.012f;
+            return;
+        }
+        if (phase == GamePhase::Placing) {
+            float s = 0.02f;
+            glm::vec2 camRight(cosf(camAngle), -sinf(camAngle));
+            glm::vec2 camFwd (-sinf(camAngle), -cosf(camAngle));
+            balls[0].pos += camRight * ((float)dx * s);
+            balls[0].pos -= camFwd * ((float)dy * s);
+            float m = BALL_RADIUS + 0.1f;
+            balls[0].pos.x = glm::clamp(balls[0].pos.x, -TABLE_HALF_W + m, TABLE_HALF_W - m);
+            balls[0].pos.y = glm::clamp(balls[0].pos.y, -TABLE_HALF_H + m, TABLE_HALF_H - m);
+        }
+    }
+    void onPointerUp(int px, int py, int64_t pointerId) {
+        if (screen == GameScreen::Start) {
+            onPointerDown(px, py, pointerId);
+            return;
+        }
+        if (screen == GameScreen::Scores) {
+            onPointerDown(px, py, pointerId);
+            return;
+        }
+        if (screen != GameScreen::Game) return;
+        if (activePointerId != pointerId) return;
+        pointerDown = false;
+        if (phase == GamePhase::Charging && pointerOwnsCharge(pointerId)) {
+            shootCueBall();
+            return;
+        }
+        if (phase == GamePhase::Placing) {
+            if (!(pointerId == -1 && mouseCaptured)) {
+                placeCueBallFromPointer(px, py);
+            }
+            if (canPlaceCueBall()) phase = GamePhase::Aiming;
+        }
+        pointerCharging = false;
+        activePointerId = std::numeric_limits<int64_t>::min();
     }
 };
 int main(int argc, char **argv) {
