@@ -21,10 +21,11 @@ A fully 3D billiards game rendered with the Vulkan graphics API, built on the **
 - Animated ball-sink effect when a ball drops into a pocket
 - Rack of 15 object balls + cue ball, 6 pockets
 - Power charge system — hold and release to set shot strength
-- Freeform camera rotation and zoom (keyboard & gamepad)
+- Freeform camera rotation and zoom (keyboard, mouse/touch, and gamepad)
 - Configurable cue ball re-placement after a scratch
 - Persistent high-score table (top 10, saved to `pool_scores.dat`)
 - Gamepad support via SDL2 Game Controller API
+- Mouse/touch menu interaction (including Start button hit area on `start.png`)
 - Wireframe debug mode
 
 ---
@@ -160,7 +161,7 @@ Pocket all 15 coloured object balls in as few shots as possible. Your score is t
 | Screen | Description |
 |--------|-------------|
 | **Intro** | Animated logo plays for 5 seconds, then transitions to the Start screen |
-| **Start** | Main menu — choose to play or view the leaderboard |
+| **Start** | Main menu — click/tap the **Start** button on `start.png`; scores are opened from keyboard/controller |
 | **Game** | The billiards table — aim, charge, and shoot |
 | **Scores** | High-score table; enter your name if you qualify |
 
@@ -168,11 +169,13 @@ Pocket all 15 coloured object balls in as few shots as possible. Your score is t
 
 #### Menus
 
+Start-screen note: there are no clickable on-screen `Scores` or `Quit` text buttons; mouse/touch Start-menu interaction is the `start.png` **Start** button.
+
 | Key | Action |
 |-----|--------|
 | `Enter` | Start game (Start screen) |
-| `Space` | Open high scores (Start screen) |
-| `ESC` | Quit; or return to Intro from Scores screen |
+| `Space` | Open high scores (Start screen, keyboard only) |
+| `ESC` | In game: release captured mouse first; otherwise quit / return from Scores |
 
 #### In-Game — Camera
 
@@ -182,6 +185,24 @@ Pocket all 15 coloured object balls in as few shots as possible. Your score is t
 | `S` | Rotate camera right |
 | `W` | Zoom in |
 | `E` | Zoom out |
+
+#### In-Game — Mouse / Touch
+
+| Input | Action |
+|------|--------|
+| Left mouse move (captured) | Aim cue in Aiming / Charging |
+| Left mouse hold → release (captured) | Charge then shoot |
+| First left click when mouse is free | Capture/focus game window only (does not shoot) |
+| `ESC` (during game) | Release mouse capture |
+| Right mouse drag | Orbit camera around table (yaw + pitch tilt) |
+| Mouse wheel | Zoom camera |
+| Touch drag | Aim cue and interact with UI elements |
+| Touch hold → release | Charge then shoot |
+| Two-finger pinch | Zoom camera |
+
+Notes:
+- When the mouse cursor is free (not captured), cue movement does not follow mouse motion.
+- After a scratch, cue-ball placement with captured mouse follows camera-relative movement (same directional basis as arrow keys).
 
 #### In-Game — Aiming & Shooting
 
@@ -210,15 +231,15 @@ Pocket all 15 coloured object balls in as few shots as possible. Your score is t
 | Right Stick (L/R) | Rotate camera |
 | Right Stick (U/D) | Zoom camera in / out |
 | **A** or **B** | Charge shot (hold) then release to fire; confirm placement; start game |
-| **Y** | Open scores (Start screen) |
+| **Y** | Open scores (Start screen, controller) |
 | **Start** | Start game |
 | **Back** | Quit |
 
 ### Shot Mechanics
 
-1. **Aim** — use `←`/`→` (or Left Stick) to rotate the cue around the cue ball.
-2. **Charge** — press `Space` (or A/B). A power percentage is displayed; it fills automatically.
-3. **Shoot** — release `Space` (or the button). The cue ball launches in the aimed direction with the charged power.
+1. **Aim** — use `←`/`→`, captured mouse movement, touch drag, or Left Stick to rotate the cue around the cue ball.
+2. **Charge** — press/hold `Space`, A/B, or hold left mouse/touch. A power percentage is displayed; it fills automatically.
+3. **Shoot** — release `Space`, A/B, mouse, or touch. The cue ball launches in the aimed direction with the charged power.
 4. **Physics** — the simulation runs at a variable sub-step rate to prevent tunneling at high speeds. Friction is applied per step; balls rebound off the cushions with 80 % energy retained.
 5. **Scratch** — if the cue ball is pocketed it is placed back on the table and you enter Placing mode.
 6. **Game Over** — once all 15 object balls are pocketed you are taken to the Scores screen.
