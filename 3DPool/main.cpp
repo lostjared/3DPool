@@ -119,7 +119,7 @@ public:
             auto p = line.find(':');
             if (p != std::string::npos) {
                 entries.push_back({line.substr(0, p),
-                    (int)std::strtol(line.substr(p+1).c_str(), nullptr, 10)});
+                    static_cast<int>(std::strtol(line.substr(p+1).c_str(), nullptr, 10))});
                 count++;
             }
         }
@@ -358,11 +358,11 @@ public:
             scoresBackground->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
             scoresBackground->drawSpriteRect(0, 0, getWidth(), getHeight());
         }
-        int feltL = (int)(w * 0.125f);   
-        int feltT = (int)(h * 0.19f);    
-        int feltB = (int)(h * 0.87f);    
+        int feltL = static_cast<int>(w * 0.125f);
+        int feltT = static_cast<int>(h * 0.19f);
+        int feltB = static_cast<int>(h * 0.87f);
         int feltH = feltB - feltT;
-        int feltCX = (int)(w * 0.48f);    
+        int feltCX = static_cast<int>(w * 0.48f);
         int fs = std::max(10, feltH / 15);
         if (fs != lastScoreFontSize) {
             setFont("font.ttf", fs);
@@ -376,13 +376,13 @@ public:
             std::string row = ss.str();
             SDL_Color col = {255, 255, 255, 255};
             if (enteringName && finalScore > 0) {
-                int rank = (int)scoreList.size();
-                for (int j = 0; j < (int)scoreList.size(); j++) {
+                int rank = static_cast<int>(scoreList.size());
+                for (int j = 0; j < static_cast<int>(scoreList.size()); j++) {
                     if (finalScore < scoreList[j].shots) { rank = j; break; }
                 }
-                if ((int)i == rank) col = {0, 255, 0, 255};
+                if (static_cast<int>(i) == rank) col = {0, 255, 0, 255};
             }
-            printText(row, feltL + fs / 2, feltT + (int)i * lineH, col);
+            printText(row, feltL + fs / 2, feltT + static_cast<int>(i) * lineH, col);
         }
         if (enteringName) {
             int entryY = feltT + 10 * lineH + lineH / 2;
@@ -459,8 +459,8 @@ public:
         rpInfo.pClearValues = cv.data();
         VkCommandBuffer cmd = commandBuffers[imageIndex];
         vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-        VkViewport vp{}; vp.width = (float)swapChainExtent.width;
-        vp.height = (float)swapChainExtent.height; vp.maxDepth = 1.0f;
+        VkViewport vp{}; vp.width = static_cast<float>(swapChainExtent.width);
+        vp.height = static_cast<float>(swapChainExtent.height); vp.maxDepth = 1.0f;
         VkRect2D sc{}; sc.extent = swapChainExtent;
         vkCmdSetViewport(cmd, 0, 1, &vp);
         vkCmdSetScissor(cmd, 0, 1, &sc);
@@ -597,7 +597,7 @@ public:
     void event(SDL_Event &e) override {
         if (e.type == SDL_QUIT) { quit(); return; }
         if (e.type == SDL_MOUSEWHEEL && screen == GameScreen::Game) {
-            float wheelY = (e.wheel.preciseY != 0.0f) ? e.wheel.preciseY : (float)e.wheel.y;
+            float wheelY = (e.wheel.preciseY != 0.0f) ? e.wheel.preciseY : static_cast<float>(e.wheel.y);
             camZoom -= wheelY * 1.2f;
             camZoom = glm::clamp(camZoom, 5.0f, 25.0f);
             return;
@@ -606,8 +606,8 @@ public:
             && screen == GameScreen::Game) {
             if (!mouseCaptured) setMouseCapture(true);
             mouseCamDragging = true;
-            mouseCamLastX = (int)e.button.x;
-            mouseCamLastY = (int)e.button.y;
+            mouseCamLastX = static_cast<int>(e.button.x);
+            mouseCamLastY = static_cast<int>(e.button.y);
             return;
         }
         if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
@@ -616,14 +616,14 @@ public:
                 consumeNextMouseLeftUp = true;
                 return;
             }
-            onPointerDown((int)e.button.x, (int)e.button.y, -1);
+            onPointerDown(static_cast<int>(e.button.x), static_cast<int>(e.button.y), -1);
             return;
         }
         if (e.type == SDL_MOUSEMOTION) {
             if (screen == GameScreen::Game && mouseCaptured) {
                 if (mouseCamDragging) {
-                    camAngle += (float)e.motion.xrel * 0.01f;
-                    camPitch -= (float)e.motion.yrel * 0.006f;
+                    camAngle += static_cast<float>(e.motion.xrel) * 0.01f;
+                    camPitch -= static_cast<float>(e.motion.yrel) * 0.006f;
                     camPitch = glm::clamp(camPitch, 0.30f, 1.25f);
                     return;
                 }
@@ -631,18 +631,18 @@ public:
                 return;
             }
             if (mouseCamDragging && screen == GameScreen::Game) {
-                int nx = (int)e.motion.x;
-                int ny = (int)e.motion.y;
+                int nx = static_cast<int>(e.motion.x);
+                int ny = static_cast<int>(e.motion.y);
                 int dx = nx - mouseCamLastX;
                 int dy = ny - mouseCamLastY;
-                camAngle += (float)dx * 0.01f;
-                camPitch -= (float)dy * 0.006f;
+                camAngle += static_cast<float>(dx) * 0.01f;
+                camPitch -= static_cast<float>(dy) * 0.006f;
                 camPitch = glm::clamp(camPitch, 0.30f, 1.25f);
                 mouseCamLastX = nx;
                 mouseCamLastY = ny;
                 return;
             }
-            onPointerMove((int)e.motion.x, (int)e.motion.y, -1);
+            onPointerMove(static_cast<int>(e.motion.x), static_cast<int>(e.motion.y), -1);
             return;
         }
         if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT) {
@@ -654,13 +654,13 @@ public:
                 consumeNextMouseLeftUp = false;
                 return;
             }
-            onPointerUp((int)e.button.x, (int)e.button.y, -1);
+            onPointerUp(static_cast<int>(e.button.x), static_cast<int>(e.button.y), -1);
             return;
         }
         if (e.type == SDL_FINGERDOWN) {
-            int px = (int)(e.tfinger.x * (float)w);
-            int py = (int)(e.tfinger.y * (float)h);
-            touchPoints[(int64_t)e.tfinger.fingerId] = SDL_FPoint{(float)px, (float)py};
+            int px = static_cast<int>(e.tfinger.x * static_cast<float>(w));
+            int py = static_cast<int>(e.tfinger.y * static_cast<float>(h));
+            touchPoints[static_cast<int64_t>(e.tfinger.fingerId)] = SDL_FPoint{static_cast<float>(px), static_cast<float>(py)};
             if (screen == GameScreen::Game && touchPoints.size() == 2) {
                 auto it = touchPoints.begin();
                 SDL_FPoint a = it->second;
@@ -677,13 +677,13 @@ public:
                 activePointerId = std::numeric_limits<int64_t>::min();
                 return;
             }
-            onPointerDown(px, py, (int64_t)e.tfinger.fingerId);
+            onPointerDown(px, py, static_cast<int64_t>(e.tfinger.fingerId));
             return;
         }
         if (e.type == SDL_FINGERMOTION) {
-            int px = (int)(e.tfinger.x * (float)w);
-            int py = (int)(e.tfinger.y * (float)h);
-            touchPoints[(int64_t)e.tfinger.fingerId] = SDL_FPoint{(float)px, (float)py};
+            int px = static_cast<int>(e.tfinger.x * static_cast<float>(w));
+            int py = static_cast<int>(e.tfinger.y * static_cast<float>(h));
+            touchPoints[static_cast<int64_t>(e.tfinger.fingerId)] = SDL_FPoint{static_cast<float>(px), static_cast<float>(py)};
             if (screen == GameScreen::Game && touchPinchActive && touchPoints.size() >= 2) {
                 auto it = touchPoints.begin();
                 SDL_FPoint a = it->second;
@@ -696,14 +696,14 @@ public:
                 camZoom = glm::clamp(camZoom, 5.0f, 25.0f);
                 return;
             }
-            onPointerMove(px, py, (int64_t)e.tfinger.fingerId);
+            onPointerMove(px, py, static_cast<int64_t>(e.tfinger.fingerId));
             return;
         }
         if (e.type == SDL_FINGERUP) {
-            int px = (int)(e.tfinger.x * (float)w);
-            int py = (int)(e.tfinger.y * (float)h);
+            int px = static_cast<int>(e.tfinger.x * static_cast<float>(w));
+            int py = static_cast<int>(e.tfinger.y * static_cast<float>(h));
             bool wasPinching = touchPinchActive;
-            touchPoints.erase((int64_t)e.tfinger.fingerId);
+            touchPoints.erase(static_cast<int64_t>(e.tfinger.fingerId));
             if (touchPinchActive && touchPoints.size() < 2) {
                 touchPinchActive = false;
                 touchPinchDistance = 0.0f;
@@ -714,7 +714,7 @@ public:
                 activePointerId = std::numeric_limits<int64_t>::min();
                 return;
             }
-            onPointerUp(px, py, (int64_t)e.tfinger.fingerId);
+            onPointerUp(px, py, static_cast<int64_t>(e.tfinger.fingerId));
             return;
         }
         if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
@@ -1097,8 +1097,8 @@ private:
         ubo.model = m;
         ubo.view = v;
         ubo.proj = p;
-        ubo.params = glm::vec4(t, (float)swapChainExtent.width,
-                               (float)swapChainExtent.height, 0.0f);
+        ubo.params = glm::vec4(t, static_cast<float>(swapChainExtent.width),
+                       static_cast<float>(swapChainExtent.height), 0.0f);
         ubo.color = col;
         memcpy(objUBOMapped[slot], &ubo, sizeof(ubo));
         VkDescriptorImageInfo imgInfo{};
@@ -1127,8 +1127,8 @@ private:
         ubo.model = m;
         ubo.view = v;
         ubo.proj = p;
-        ubo.params = glm::vec4(t, (float)swapChainExtent.width,
-                               (float)swapChainExtent.height, 0.0f);
+        ubo.params = glm::vec4(t, static_cast<float>(swapChainExtent.width),
+                       static_cast<float>(swapChainExtent.height), 0.0f);
         ubo.color = col;
         memcpy(objUBOMapped[slot], &ubo, sizeof(ubo));
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1208,9 +1208,9 @@ private:
             }
         }
         float maxMovePerStep = BALL_RADIUS * 0.75f;
-        int steps = std::max(8, (int)std::ceil(maxSpeed * dt * 60.0f / maxMovePerStep));
-        float sub = dt / (float)steps;
-        float stepFriction = std::pow(FRICTION, 4.0f / (float)steps);
+        int steps = std::max(8, static_cast<int>(std::ceil(maxSpeed * dt * 60.0f / maxMovePerStep)));
+        float sub = dt / static_cast<float>(steps);
+        float stepFriction = std::pow(FRICTION, 4.0f / static_cast<float>(steps));
         for (int s = 0; s < steps; s++) {
             for (auto &b : balls) {
                 if (!b.active || b.pocketed) continue;
@@ -1294,14 +1294,14 @@ private:
     }
     bool screenPointToTable(int px, int py, glm::vec2 &out) const {
         if (w <= 0 || h <= 0) return false;
-        float aspect = (float)w / (float)h;
+        float aspect = static_cast<float>(w) / static_cast<float>(h);
         glm::vec3 camPos = getCameraPosition();
         glm::vec3 camTarget = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::mat4 viewMat = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
         projMat[1][1] *= -1.0f;
-        float nx = (2.0f * ((float)px + 0.5f) / (float)w) - 1.0f;
-        float ny = 1.0f - (2.0f * ((float)py + 0.5f) / (float)h);
+        float nx = (2.0f * (static_cast<float>(px) + 0.5f) / static_cast<float>(w)) - 1.0f;
+        float ny = 1.0f - (2.0f * (static_cast<float>(py) + 0.5f) / static_cast<float>(h));
         glm::vec4 nearClip(nx, ny, 0.0f, 1.0f);
         glm::vec4 farClip(nx, ny, 1.0f, 1.0f);
         glm::mat4 invVP = glm::inverse(projMat * viewMat);
@@ -1370,10 +1370,10 @@ private:
         return x >= r.x && x <= (r.x + r.w) && y >= r.y && y <= (r.y + r.h);
     }
     SDL_Rect makeNormRect(float cxN, float cyN, float wN, float hN) const {
-        int rw = std::max(1, (int)(w * wN));
-        int rh = std::max(1, (int)(h * hN));
-        int cx = (int)(w * cxN);
-        int cy = (int)(h * cyN);
+        int rw = std::max(1, static_cast<int>(w * wN));
+        int rh = std::max(1, static_cast<int>(h * hN));
+        int cx = static_cast<int>(w * cxN);
+        int cy = static_cast<int>(h * cyN);
         SDL_Rect r;
         r.x = cx - rw / 2;
         r.y = cy - rh / 2;
@@ -1385,12 +1385,12 @@ private:
         startPlayRect = makeNormRect(0.50f, 0.78f, 0.28f, 0.11f);
     }
     void updateScoresClickTargets() {
-        int feltT = (int)(h * 0.19f);
-        int feltB = (int)(h * 0.87f);
+        int feltT = static_cast<int>(h * 0.19f);
+        int feltB = static_cast<int>(h * 0.87f);
         int feltH = feltB - feltT;
         int fs = std::max(10, feltH / 15);
         int lineH = fs + fs / 3;
-        int feltCX = (int)(w * 0.48f);
+        int feltCX = static_cast<int>(w * 0.48f);
         if (enteringName) {
             int entryY = feltT + 10 * lineH + lineH / 2;
             std::string conf = "ENTER to confirm";
@@ -1472,15 +1472,15 @@ private:
     void onMouseRelativeMove(int dx, int dy) {
         if (screen != GameScreen::Game) return;
         if (phase == GamePhase::Aiming || phase == GamePhase::Charging) {
-            cueAngle += (float)dx * 0.012f;
+            cueAngle += static_cast<float>(dx) * 0.012f;
             return;
         }
         if (phase == GamePhase::Placing) {
             float s = 0.02f;
             glm::vec2 camRight(cosf(camAngle), -sinf(camAngle));
             glm::vec2 camFwd (-sinf(camAngle), -cosf(camAngle));
-            balls[0].pos += camRight * ((float)dx * s);
-            balls[0].pos -= camFwd * ((float)dy * s);
+            balls[0].pos += camRight * (static_cast<float>(dx) * s);
+            balls[0].pos -= camFwd * (static_cast<float>(dy) * s);
             float m = BALL_RADIUS + 0.1f;
             balls[0].pos.x = glm::clamp(balls[0].pos.x, -TABLE_HALF_W + m, TABLE_HALF_W - m);
             balls[0].pos.y = glm::clamp(balls[0].pos.y, -TABLE_HALF_H + m, TABLE_HALF_H - m);
