@@ -153,7 +153,7 @@ public:
     ~PoolWindow() override = default;
     void initVulkan() override {
         mx::VKWindow::initVulkan();
-        SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+        enableControllerInput();
         for (int i = 0; i < SDL_NumJoysticks(); i++) {
             if (SDL_IsGameController(i)) {
                 gameController = SDL_GameControllerOpen(i);
