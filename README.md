@@ -17,10 +17,10 @@ A fully 3D billiards game rendered with the Vulkan graphics API, built on the **
 ## Features
 
 - Real-time 3D Vulkan rendering with perspective camera (Requires your Graphics Card supports Vulkan)
-- Full physics simulation — friction, ball–ball collisions, wall bounces, pocket detection
+- Full physics simulation  friction, ballball collisions, wall bounces, pocket detection
 - Animated ball-sink effect when a ball drops into a pocket
 - Rack of 15 object balls + cue ball, 6 pockets
-- Power charge system — hold and release to set shot strength
+- Power charge system  hold and release to set shot strength
 - Freeform camera rotation and zoom (keyboard, mouse/touch, and gamepad)
 - Configurable cue ball re-placement after a scratch
 - Persistent high-score table (top 10, saved to `pool_scores.dat`)
@@ -40,17 +40,17 @@ A fully 3D billiards game rendered with the Vulkan graphics API, built on the **
 | **mxgl** | Optional OpenGL/GLAD layer: GL shader helpers, 3D model loading, in-app console |
 | **mxvk** | Vulkan layer: Vulkan initialisation (via volk / MoltenVK), pipeline & shader helpers, 3D model rendering, sprite batching, text rendering |
 
-3D Pool uses **mx** + **mxvk** — no OpenGL dependency.
+3D Pool uses **mx** + **mxvk**  no OpenGL dependency.
 
 Key MX2 classes used by this project:
 
-- `mx::VKWindow` — Vulkan-backed SDL2 window; provides the swap chain, render pass, command buffers, semaphores, and the `initVulkan() / proc() / draw() / event() / cleanup()` lifecycle.
-- `mx::MXModel` — Loads and renders `.mxmod.z` (compressed binary mesh) files through Vulkan vertex/index buffers.
-- `mx::VKSprite` — Batched 2D sprite renderer; used for background and screen overlays.
-- `mx::UniformBufferObject` — Standard MVP + params UBO uploaded per draw call.
-- `mx::Exception` — Engine exception type.
+- `mx::VKWindow`  Vulkan-backed SDL2 window; provides the swap chain, render pass, command buffers, semaphores, and the `initVulkan() / proc() / draw() / event() / cleanup()` lifecycle.
+- `mx::MXModel`  Loads and renders `.mxmod.z` (compressed binary mesh) files through Vulkan vertex/index buffers.
+- `mx::VKSprite`  Batched 2D sprite renderer; used for background and screen overlays.
+- `mx::UniformBufferObject`  Standard MVP + params UBO uploaded per draw call.
+- `mx::Exception`  Engine exception type.
 
-3D models are stored as `.mxmod.z` files (zlib-compressed MX model format) and SPIR-V shaders are pre-compiled to `.spv` files — both live under `data/`.
+3D models are stored as `.mxmod.z` files (zlib-compressed MX model format) and SPIR-V shaders are pre-compiled to `.spv` files  both live under `data/`.
 
 **libmx2 source & documentation:** https://github.com/lostjared/libmx2  
 **Tech spec page:** https://lostsidedead.biz/libmx2/mx.html
@@ -61,12 +61,12 @@ Key MX2 classes used by this project:
 
 | Dependency | Role |
 |------------|------|
-| libmx2 (mx + mxvk) | Engine — Vulkan window, models, sprites, text |
+| libmx2 (mx + mxvk) | Engine  Vulkan window, models, sprites, text |
 | Vulkan loader **or** MoltenVK (macOS) | GPU API |
 | SDL2 | Window, input, events |
 | SDL2_ttf | In-game text rendering |
 | SDL2_mixer | Audio subsystem (engine requirement) |
-| GLM | Math — vectors, matrices, transforms |
+| GLM | Math  vectors, matrices, transforms |
 | libpng + zlib | PNG texture loading |
 
 ### Install dependencies
@@ -107,12 +107,12 @@ mkdir build && cd build
 cmake ..
 make -j$(nproc)
 
-# macOS (MoltenVK — auto-detected from Homebrew)
+# macOS (MoltenVK  auto-detected from Homebrew)
 mkdir build && cd build
 cmake ..          # MOLTEN=ON is the default on Apple platforms
 make -j$(nproc)
 
-# macOS — specify MoltenVK path manually if needed
+# macOS  specify MoltenVK path manually if needed
 cmake .. -DMOLTEN_PATH=/opt/homebrew/opt/molten-vk
 make -j$(nproc)
 
@@ -130,13 +130,13 @@ After a successful build the binary and the `data/` directory are placed togethe
 ## Running
 
 ```bash
-# From the build directory — '.' tells the engine where to find data/ and font.ttf
+# From the build directory  '.' tells the engine where to find data/ and font.ttf
 ./3DPool -p .
 
 # Fullscreen
 ./3DPool -p . -f
 
-# Custom resolution (default: 1280×720)
+# Custom resolution (default: 1280720)
 ./3DPool -p . -r 1920x1080
 
 # Show all options
@@ -161,8 +161,8 @@ Pocket all 15 coloured object balls in as few shots as possible. Your score is t
 | Screen | Description |
 |--------|-------------|
 | **Intro** | Animated logo plays for 5 seconds, then transitions to the Start screen |
-| **Start** | Main menu — click/tap the **Start** button on `start.png`; scores are opened from keyboard/controller |
-| **Game** | The billiards table — aim, charge, and shoot |
+| **Start** | Main menu  click/tap the **Start** button on `start.png`; scores are opened from keyboard/controller |
+| **Game** | The billiards table  aim, charge, and shoot |
 | **Scores** | High-score table; enter your name if you qualify |
 
 ### Keyboard Controls
@@ -177,7 +177,7 @@ Start-screen note: there are no clickable on-screen `Scores` or `Quit` text butt
 | `Space` | Open high scores (Start screen, keyboard only) |
 | `ESC` | In game: release captured mouse first; otherwise quit / return from Scores |
 
-#### In-Game — Camera
+#### In-Game  Camera
 
 | Key | Action |
 |-----|--------|
@@ -186,33 +186,33 @@ Start-screen note: there are no clickable on-screen `Scores` or `Quit` text butt
 | `W` | Zoom in |
 | `E` | Zoom out |
 
-#### In-Game — Mouse / Touch
+#### In-Game  Mouse / Touch
 
 | Input | Action |
 |------|--------|
 | Left mouse move (captured) | Aim cue in Aiming / Charging |
-| Left mouse hold → release (captured) | Charge then shoot |
+| Left mouse hold  release (captured) | Charge then shoot |
 | First left click when mouse is free | Capture/focus game window only (does not shoot) |
 | `ESC` (during game) | Release mouse capture |
 | Right mouse drag | Orbit camera around table (yaw + pitch tilt) |
 | Mouse wheel | Zoom camera |
 | Touch drag | Aim cue and interact with UI elements |
-| Touch hold → release | Charge then shoot |
+| Touch hold  release | Charge then shoot |
 | Two-finger pinch | Zoom camera |
 
 Notes:
 - When the mouse cursor is free (not captured), cue movement does not follow mouse motion.
 - After a scratch, cue-ball placement with captured mouse follows camera-relative movement (same directional basis as arrow keys).
 
-#### In-Game — Aiming & Shooting
+#### In-Game  Aiming & Shooting
 
 | Phase | Key | Action |
 |-------|-----|--------|
-| Aiming | `←` / `→` | Rotate the cue left / right |
+| Aiming | `` / `` | Rotate the cue left / right |
 | Aiming | `Space` | Begin charging the shot |
-| Charging | `←` / `→` | Still adjust aim while charging |
-| Charging | Release `Space` | Fire — power is determined by how long you held Space |
-| Placing (after scratch) | `←` `→` `↑` `↓` | Move the cue ball around the table |
+| Charging | `` / `` | Still adjust aim while charging |
+| Charging | Release `Space` | Fire  power is determined by how long you held Space |
+| Placing (after scratch) | `` `` `` `` | Move the cue ball around the table |
 | Placing | `Enter` | Confirm cue ball position and return to Aiming |
 
 #### Other
@@ -237,12 +237,12 @@ Notes:
 
 ### Shot Mechanics
 
-1. **Aim** — use `←`/`→`, captured mouse movement, touch drag, or Left Stick to rotate the cue around the cue ball.
-2. **Charge** — press/hold `Space`, A/B, or hold left mouse/touch. A power percentage is displayed; it fills automatically.
-3. **Shoot** — release `Space`, A/B, mouse, or touch. The cue ball launches in the aimed direction with the charged power.
-4. **Physics** — the simulation runs at a variable sub-step rate to prevent tunneling at high speeds. Friction is applied per step; balls rebound off the cushions with 80 % energy retained.
-5. **Scratch** — if the cue ball is pocketed it is placed back on the table and you enter Placing mode.
-6. **Game Over** — once all 15 object balls are pocketed you are taken to the Scores screen.
+1. **Aim**  use ``/``, captured mouse movement, touch drag, or Left Stick to rotate the cue around the cue ball.
+2. **Charge**  press/hold `Space`, A/B, or hold left mouse/touch. A power percentage is displayed; it fills automatically.
+3. **Shoot**  release `Space`, A/B, mouse, or touch. The cue ball launches in the aimed direction with the charged power.
+4. **Physics**  the simulation runs at a variable sub-step rate to prevent tunneling at high speeds. Friction is applied per step; balls rebound off the cushions with 80 % energy retained.
+5. **Scratch**  if the cue ball is pocketed it is placed back on the table and you enter Placing mode.
+6. **Game Over**  once all 15 object balls are pocketed you are taken to the Scores screen.
 
 ### High Scores
 
@@ -254,13 +254,13 @@ Scores are saved to `pool_scores.dat` in the working directory. The table holds 
 
 ```
 3DPool/
-├── main.cpp          # Entire game — PoolWindow class + physics + rendering
-├── font.ttf          # TrueType font used for all in-game text
-├── CMakeLists.txt    # Standalone CMake build with full dependency checks
-└── data/
-    ├── *.mxmod.z     # Compressed 3D models (sphere, cylinder, cube, pool table parts)
-    ├── *.spv         # Pre-compiled SPIR-V shaders
-    └── *.png / *.bmp # Textures and UI images
+ main.cpp          # Entire game  PoolWindow class + physics + rendering
+ font.ttf          # TrueType font used for all in-game text
+ CMakeLists.txt    # Standalone CMake build with full dependency checks
+ data/
+     *.mxmod.z     # Compressed 3D models (sphere, cylinder, cube, pool table parts)
+     *.spv         # Pre-compiled SPIR-V shaders
+     *.png / *.bmp # Textures and UI images
 ```
 
 ---

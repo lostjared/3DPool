@@ -22,13 +22,13 @@ vec3 lampBulb(vec3 bulbPos, vec3 lampCol, vec3 worldPos, vec3 normal, vec3 baseC
     float dist    = length(lv);
     vec3  ldir    = lv / max(dist, 0.001);
 
-    // N·L gives the shading gradient: faces pointing toward the bulb
+    // NL gives the shading gradient: faces pointing toward the bulb
     // get full light; the horizontal wood sides naturally receive very little.
     float diff    = max(dot(normal, ldir), 0.0);
 
     // Quadratic falloff tuned for a lamp ~2.5 units above the table surface.
-    // At dist=0 → 1.0, at dist=2.5 (center below bulb) → ~0.84,
-    // at dist=7 (far table corner) → ~0.13, giving the bright-center gradient.
+    // At dist=0  1.0, at dist=2.5 (center below bulb)  ~0.84,
+    // at dist=7 (far table corner)  ~0.13, giving the bright-center gradient.
     float atten   = 1.0 / (1.0 + 0.18 * dist + 0.12 * dist * dist);
 
     // Blinn-Phong specular for shiny ball highlights
@@ -46,13 +46,13 @@ void main() {
 
     // ------------------------------------------------------------------
     // Lamp bar: three bulbs hanging 2.5 units above the table,
-    // spaced along the table's long axis – just like a real billiard lamp.
-    // The low hang height means the N·L term naturally falls from nearly 1.0
+    // spaced along the table's long axis  just like a real billiard lamp.
+    // The low hang height means the NL term naturally falls from nearly 1.0
     // directly below each bulb to ~0.3 at the far corners, producing the
     // classic bright-centre-to-dark-edges gradient without any artificial cone.
     // ------------------------------------------------------------------
     vec3 lampCol = vec3(1.0, 0.92, 0.72); // warm incandescent yellow-white
-    float lampY  = 2.5;                   // height above table (y≈0)
+    float lampY  = 2.5;                   // height above table (y0)
 
     vec3 light = vec3(0.0);
     light += lampBulb(vec3(-4.2, lampY, 0.0), lampCol, fragWorldPos, normal, fragColor);
@@ -62,7 +62,7 @@ void main() {
     // Scale up so the table surface is nicely bright
     light *= 2.8;
 
-    // Soft fill light from below/side opposite the lamps – gives the dark
+    // Soft fill light from below/side opposite the lamps  gives the dark
     // side of balls a visible cool tone instead of pure black.
     // No specular, very low intensity, just enough to show colour.
     vec3 fillDir = normalize(vec3(0.3, -0.6, 0.5));
